@@ -1,0 +1,6 @@
+[submodule "classic-frontend"]
+	path = classic-frontend
+	url = git@github.com:gene-telligent/classic-frontend.git
+[submodule "backend-replacement"]
+	path = backend-replacement
+	url = git@github.com:gene-telligent/backend-replacement.git

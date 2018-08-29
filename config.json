@@ -1,0 +1,13 @@
+{
+	"tokens" : 
+	[
+		{
+			"name": "GeneCoin",
+			"symbol": "GEN"
+		},
+		{
+			"name": "LewCoin",
+			"symbol": "LEW"
+		}
+	]
+}
