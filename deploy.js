@@ -16,7 +16,7 @@ const async = require("async");
 web3 = new Web3(new Web3.providers.HttpProvider('http://localhost:8545'));
 
 let etherDeltaAbi = JSON.parse(fs.readFileSync('./smart_contract/etherdelta.sol.json', 'utf8'));
-let etherDeltaByteCode = fs.readFileSync('./smart_contract/etherdelta.sol.bytecode', 'utf8');
+let etherDeltaByteCode = fs.readFileSync('./smart_contract/etherdelta.sol.bytecode', 'utf8').slice(1, -2);
 
 let fixedTokenByteCode = fs.readFileSync('./smart_contract/fixedToken.sol.bytecode', 'utf8');
 let fixedTokenAbi = JSON.parse(fs.readFileSync('./smart_contract/fixedToken.sol.json', 'utf8'));
@@ -35,6 +35,7 @@ function deployToken(symbol, name, owner, callback) {
 		gas: '4700000'
 	})
 	.on('receipt', function(receipt) {
+		console.log("receipt for symbol " + symbol);
 		fixedsupplytokenContract.options.address = receipt.contractAddress;
 		callback(null, {
 			contract: fixedsupplytokenContract,
@@ -45,6 +46,7 @@ function deployToken(symbol, name, owner, callback) {
 		})
 	})
 	.on('error', function(err, receipt) {
+		console.log("Error for symbol " + symbol);
 		callback(err, {
 			contract: fixedsupplytokenContract,
 			receipt: receipt,
@@ -78,13 +80,12 @@ could have made this easier on myself by having the first account be the owner o
 edit: just did */
 web3.eth.personal.getAccounts()
 .then(function(accts) {
-	//var mapped = web3.utils._.zip(accts.slice(0, config.tokens.length), config.tokens);
 
-	//async.map(mapped, (item, callback) => {
+	
 	async.map(config.tokens, (tokenInfo, callback) => {
 		//var acct = item[0];
 		//var tokenInfo = item[1];
-		console.log("Deploying token " + tokenInfo.symbol);
+		console.log("Deploying token " + tokenInfo.symbol + " for account " + accts[0]);
 		deployToken(tokenInfo.symbol, tokenInfo.name, accts[0], callback);
 		console.log("Deployed token " + tokenInfo.symbol);
 	}, (err, tokenReceipts) => {
@@ -104,17 +105,56 @@ web3.eth.personal.getAccounts()
 		});
 
 		fs.writeFileSync('./tokenState.json', JSON.stringify(tokenState));
-
+		
 		tokenReceipts.forEach((tokenReceipt) => {
 			var toTransfer = web3.utils._.filter(accts, (acct) => {return acct != tokenReceipt.owner});
 			async.map(toTransfer, (acct, callback) => {
 				transferTokens(tokenReceipt.contract, tokenReceipt.owner, acct, 10000, callback); 
 			}, (err, transferReceipts) => {
-				if (typeof err !== 'undefined')
+				if (err !== null) {
 					console.error(err);
+					process.exit(1);
+				}
+
 				//transferReceipts.forEach(console.log)
 			})
 		});
+	});	
+
+
+
+	/* Also, we need to deploy the etherdelta contract. */
+	// Todo:clean this the fuck up
+
+
+	var etherDeltaContract = new web3.eth.Contract(etherDeltaAbi);
+	console.log("etherdelta contact created");
+	etherDeltaContract.deploy({
+		data: '0x' + etherDeltaByteCode,
+		arguments: [accts[0], accts[0], accts[0], 0, 0, 0]
+	})
+	.send({
+		from: accts[0],
+		gas: '4700000'
+	})
+	.on('receipt', function(receipt) {
+		console.log("deployed with receipt");
+		fs.writeFileSync('./etherDeltaContractState.json', JSON.stringify({
+			address: receipt.contractAddress,
+			owner: accts[0]
+		}));
+	})
+	.on('error', function(err, receipt) {
+		console.error("!!!ERROR!");
+		console.error(err);
+		console.error(receipt);
+		process.exit(1);
 	});
+
 });
+
+
+
+
+
 
