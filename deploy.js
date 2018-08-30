@@ -71,28 +71,50 @@ function transferTokens(tokenContract, from, to, amount, callback) {
 }
 
 
+/* Take X amount of generated accounts (where X is the amount of fake tokens to be created),
+generate a token with each account, then distribute tokens to every other account. Probably
+could have made this easier on myself by having the first account be the owner of all the contracts.
 
+edit: just did */
 web3.eth.personal.getAccounts()
 .then(function(accts) {
-	var mapped = web3.utils._.zip(accts.slice(0, config.tokens.length), config.tokens);
+	//var mapped = web3.utils._.zip(accts.slice(0, config.tokens.length), config.tokens);
 
-	async.map(mapped, (item, callback) => {
-		var acct = item[0];
-		var tokenInfo = item[1];
-		deployToken(tokenInfo.symbol, tokenInfo.name, acct, callback);
-	}, (err, results) => {
-		if (typeof err !== 'undefined')
+	//async.map(mapped, (item, callback) => {
+	async.map(config.tokens, (tokenInfo, callback) => {
+		//var acct = item[0];
+		//var tokenInfo = item[1];
+		console.log("Deploying token " + tokenInfo.symbol);
+		deployToken(tokenInfo.symbol, tokenInfo.name, accts[0], callback);
+		console.log("Deployed token " + tokenInfo.symbol);
+	}, (err, tokenReceipts) => {
+		if (err !== null) {
 			console.error(err);
-		results.forEach((result) => {
-			var toTransfer = web3.utils._.filter(accts, (acct) => {return acct != result.owner});
-			console.log(toTransfer);
+			process.exit(1);
+		}
+
+		let tokenState = [];
+		tokenReceipts.forEach((tokenReceipt) => {
+			tokenState.push({
+				symbol: tokenReceipt.symbol,
+				name: tokenReceipt.name,
+				owner: tokenReceipt.owner,
+				address: tokenReceipt.contract.options.address
+			});
+		});
+
+		fs.writeFileSync('./tokenState.json', JSON.stringify(tokenState));
+
+		tokenReceipts.forEach((tokenReceipt) => {
+			var toTransfer = web3.utils._.filter(accts, (acct) => {return acct != tokenReceipt.owner});
 			async.map(toTransfer, (acct, callback) => {
-				transferTokens(result.contract, result.owner, acct, 10000, callback);
+				transferTokens(tokenReceipt.contract, tokenReceipt.owner, acct, 10000, callback); 
 			}, (err, transferReceipts) => {
 				if (typeof err !== 'undefined')
 					console.error(err);
-				transferReceipts.forEach(console.log)
+				//transferReceipts.forEach(console.log)
 			})
 		});
 	});
 });
+

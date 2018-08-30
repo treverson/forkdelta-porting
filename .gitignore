@@ -165,3 +165,6 @@ typings/
 
 
 # End of https://www.gitignore.io/api/node,macos,linux,solidity
+
+# state files
+tokenState.json
